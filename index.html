@@ -225,11 +225,6 @@
     color:var(--green); font:700 10px 'JetBrains Mono', monospace;
     letter-spacing:0.08em;
   }
-  .install-steps{
-    width:min(100%, 310px);
-    display:grid; gap:8px;
-    text-align:left;
-  }
   @media (max-width:430px){
     .screen{ padding:24px 20px; gap:13px; }
     .game-title{ font-size:32px; }
@@ -277,22 +272,7 @@
       <div class="rule"><span class="rule-num">03</span><span>No muevas la cabeza ni hagas ningún gesto.</span></div>
     </div>
     <button id="btnStart">Iniciar</button>
-    <button class="ghost" id="btnInstall">Instalar en iPhone</button>
     <div class="footnote">En iPhone, ábrelo en Safari y permite la cámara. El vídeo se procesa en el dispositivo y no se guarda.</div>
-  </div>
-
-  <!-- INSTALL HELP -->
-  <div class="screen" id="screenInstall" hidden>
-    <div class="glyph">⇧</div>
-    <div class="eyebrow">App para iPhone</div>
-    <h1>Añadir a pantalla de inicio</h1>
-    <p class="desc">Abre este juego en Safari y sigue estos pasos:</p>
-    <div class="install-steps" aria-label="Pasos para instalar">
-      <div class="rule"><span class="rule-num">01</span><span>Pulsa el botón Compartir de Safari.</span></div>
-      <div class="rule"><span class="rule-num">02</span><span>Elige “Añadir a pantalla de inicio”.</span></div>
-      <div class="rule"><span class="rule-num">03</span><span>Activa “Abrir como app” y pulsa Añadir.</span></div>
-    </div>
-    <button id="btnInstallClose">Entendido</button>
   </div>
 
   <!-- ERROR SCREEN -->
@@ -336,7 +316,6 @@
 
   const screens = {
     start: document.getElementById('screenStart'),
-    install: document.getElementById('screenInstall'),
     error: document.getElementById('screenError'),
     calib: document.getElementById('screenCalib'),
     countdown: document.getElementById('screenCountdown'),
@@ -639,7 +618,6 @@
   const octx = overlay.getContext('2d');
   const screens = {
     start: document.getElementById('screenStart'),
-    install: document.getElementById('screenInstall'),
     error: document.getElementById('screenError'),
     calib: document.getElementById('screenCalib'),
     countdown: document.getElementById('screenCountdown'),
@@ -1078,8 +1056,6 @@
   }
 
   document.getElementById('btnStart').addEventListener('click',startCamera);
-  document.getElementById('btnInstall').addEventListener('click',() => showScreen('install'));
-  document.getElementById('btnInstallClose').addEventListener('click',() => showScreen('start'));
   document.getElementById('btnRetry').addEventListener('click',startCamera);
   document.getElementById('btnAgain').addEventListener('click',() => beginFaceSearch());
   document.getElementById('btnStop').addEventListener('click',stopCamera);
