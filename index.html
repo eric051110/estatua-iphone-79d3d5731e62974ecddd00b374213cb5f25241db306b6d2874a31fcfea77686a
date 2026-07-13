@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>ESTATUA // Escáner de Quietud</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="theme-color" content="#060a08">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ESTATUA">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #060a08;
+    --panel: #0c1310;
+    --line: #1c2b23;
+    --green: #3ef08c;
+    --green-dim: #1f6b46;
+    --red: #ff4d5e;
+    --amber: #ffb84d;
+    --text: #d8ece1;
+    --text-dim: #6f8a7c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; height:100dvh;}
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    min-height:100dvh;
+    overflow:hidden;
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+    overscroll-behavior:none;
+    touch-action:manipulation;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust:100%;
+  }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+
+  .rig{
+    position:relative;
+    width:min(94vw, 69dvh, 480px);
+    aspect-ratio: 3/4;
+    background: var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    overflow:hidden;
+    box-shadow: 0 0 0 1px rgba(62,240,140,0.04), 0 40px 80px -20px rgba(0,0,0,0.8);
+  }
+
+  /* top chrome bar */
+  .chrome{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 14px;
+    z-index:20;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
+  }
+  .chrome .id{
+    font-size:11px; letter-spacing:0.12em; color: var(--text-dim);
+    text-transform:uppercase;
+  }
+  .chrome .rec{
+    display:flex; align-items:center; gap:6px;
+    font-size:11px; letter-spacing:0.1em; color: var(--red);
+  }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--red); }
+  .dot.live{ animation: pulse 1s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+  video{
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; transform:scaleX(-1); -webkit-transform:scaleX(-1);
+    filter: saturate(0.85) contrast(1.05);
+    background:#020403;
+  }
+  canvas.overlay{
+    position:absolute; inset:0; width:100%; height:100%;
+    z-index:10; pointer-events:none;
+  }
+
+  /* HUD timer */
+  .hud{
+    position:absolute; left:0; right:0; bottom:0;
+    z-index:20;
+    padding:16px 16px 18px;
+    background: linear-gradient(to top, rgba(0,0,0,0.65), transparent);
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .timer-row{ display:flex; align-items:baseline; justify-content:space-between; }
+  .timer{
+    font-size:38px; font-weight:700; letter-spacing:0.02em;
+    color: var(--green);
+    text-shadow: 0 0 18px rgba(62,240,140,0.35);
+  }
+  .best{
+    font-size:11px; color: var(--text-dim); letter-spacing:0.08em; text-transform:uppercase;
+    text-align:right;
+  }
+  .best b{ color:var(--text); font-weight:500; }
+  .status{
+    font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color: var(--text-dim);
+  }
+  .status.warn{ color: var(--amber); }
+  .status.danger{ color: var(--red); }
+
+  /* stability meter */
+  .meter{
+    height:3px; width:100%; background:var(--line); border-radius:2px; overflow:hidden; margin-top:6px;
+  }
+  .meter > div{
+    height:100%; width:0%; background: var(--green); transition: width 0.08s linear, background 0.15s;
+  }
+
+  /* overlay screens */
+  .screen{
+    position:absolute; inset:0; z-index:30;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:16px; padding:28px;
+    background: rgba(6,10,8,0.92);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .screen[hidden]{ display:none; }
+
+  .glyph{
+    width:52px; height:52px;
+    border:1.5px solid var(--green-dim);
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color: var(--green);
+    font-size:20px;
+  }
+  h1{
+    font-size:22px; font-weight:700; letter-spacing:0.01em;
+    color: var(--text);
+  }
+  .eyebrow{
+    font-size:10.5px; letter-spacing:0.24em; text-transform:uppercase;
+    color: var(--green); font-family:'JetBrains Mono', monospace;
+  }
+  p.desc{
+    font-size:13.5px; line-height:1.55; color: var(--text-dim);
+    max-width:320px;
+  }
+  .bignum{
+    font-size:64px; font-weight:800; color: var(--green);
+    font-family:'JetBrains Mono', monospace;
+    text-shadow: 0 0 30px rgba(62,240,140,0.4);
+  }
+  .result-num{
+    font-size:46px; font-weight:800; font-family:'JetBrains Mono', monospace;
+  }
+  .result-num.fail{ color: var(--red); text-shadow:0 0 30px rgba(255,77,94,0.35); }
+
+  button{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600; font-size:13.5px; letter-spacing:0.03em;
+    padding:13px 26px;
+    background: var(--green);
+    color: #04120a;
+    border:none; border-radius:4px;
+    cursor:pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+    box-shadow: 0 0 0 rgba(62,240,140,0);
+    min-height:48px;
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+    -webkit-appearance:none;
+  }
+  button:hover{ transform: translateY(-1px); box-shadow: 0 8px 22px -8px rgba(62,240,140,0.55); }
+  button:active{ transform: translateY(0px); }
+  button.ghost{
+    background:transparent; color:var(--text-dim); border:1px solid var(--line);
+    margin-top:2px;
+  }
+  button.ghost:hover{ color:var(--text); box-shadow:none; }
+
+  .countdown-num{
+    font-size:90px; font-weight:800; font-family:'JetBrains Mono', monospace;
+    color:var(--green);
+    text-shadow: 0 0 40px rgba(62,240,140,0.5);
+  }
+
+  .footnote{
+    font-size:10px; color:var(--text-dim); letter-spacing:0.06em; max-width:280px;
+  }
+  #screenStart{ gap:13px; }
+  .game-title{
+    font-size:36px; font-weight:800; letter-spacing:0.14em;
+    color:var(--text); font-family:'JetBrains Mono', monospace;
+    text-indent:0.14em;
+  }
+  .rules{
+    width:min(100%, 310px);
+    display:grid; gap:7px;
+    text-align:left;
+  }
+  .rule{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 10px;
+    border:1px solid var(--line); border-radius:4px;
+    background:rgba(12,19,16,0.65);
+    color:var(--text-dim); font-size:11.5px;
+  }
+  .rule-num{
+    color:var(--green); font:700 10px 'JetBrains Mono', monospace;
+    letter-spacing:0.08em;
+  }
+  .install-steps{
+    width:min(100%, 310px);
+    display:grid; gap:8px;
+    text-align:left;
+  }
+  @media (max-width:430px){
+    .screen{ padding:24px 20px; gap:13px; }
+    .game-title{ font-size:32px; }
+    .rule{ padding:7px 9px; }
+    .hud{ padding-bottom:max(16px, env(safe-area-inset-bottom)); }
+  }
+  @media (orientation:landscape) and (max-height:500px){
+    .screen{ padding:18px; gap:9px; }
+    #screenStart .glyph, #screenStart .footnote{ display:none; }
+    .game-title{ font-size:25px; }
+    .rules{ gap:4px; }
+    .rule{ padding:5px 8px; font-size:10.5px; }
+    .countdown-num{ font-size:70px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="rig">
+  <div class="chrome">
+    <div class="id mono">CAM_01 · ESTATUA-SYS</div>
+    <div class="rec mono"><span class="dot" id="recDot"></span><span id="recLabel">STANDBY</span></div>
+  </div>
+
+  <video id="video" autoplay playsinline webkit-playsinline muted></video>
+  <canvas class="overlay" id="overlay"></canvas>
+
+  <div class="hud">
+    <div class="status mono" id="statusLine">ESPERANDO INICIO</div>
+    <div class="timer-row">
+      <div class="timer mono" id="timerText">0.0s</div>
+      <div class="best mono">RÉCORD<br><b id="bestText">0.0s</b></div>
+    </div>
+  </div>
+
+  <!-- START SCREEN -->
+  <div class="screen" id="screenStart">
+    <div class="glyph">◎</div>
+    <div class="eyebrow">Juego de quietud facial</div>
+    <h1 class="game-title">ESTATUA</h1>
+    <p class="desc">Demuestra cuánto tiempo puedes permanecer completamente inmóvil frente a la cámara.</p>
+    <div class="rules" aria-label="Cómo jugar">
+      <div class="rule"><span class="rule-num">01</span><span>Pulsa Iniciar y permite el acceso a la cámara.</span></div>
+      <div class="rule"><span class="rule-num">02</span><span>Coloca tu cara en el centro y espera la cuenta atrás.</span></div>
+      <div class="rule"><span class="rule-num">03</span><span>No muevas la cabeza ni hagas ningún gesto.</span></div>
+    </div>
+    <button id="btnStart">Iniciar</button>
+    <button class="ghost" id="btnInstall">Instalar en iPhone</button>
+    <div class="footnote">En iPhone, ábrelo en Safari y permite la cámara. El vídeo se procesa en el dispositivo y no se guarda.</div>
+  </div>
+
+  <!-- INSTALL HELP -->
+  <div class="screen" id="screenInstall" hidden>
+    <div class="glyph">⇧</div>
+    <div class="eyebrow">App para iPhone</div>
+    <h1>Añadir a pantalla de inicio</h1>
+    <p class="desc">Abre este juego en Safari y sigue estos pasos:</p>
+    <div class="install-steps" aria-label="Pasos para instalar">
+      <div class="rule"><span class="rule-num">01</span><span>Pulsa el botón Compartir de Safari.</span></div>
+      <div class="rule"><span class="rule-num">02</span><span>Elige “Añadir a pantalla de inicio”.</span></div>
+      <div class="rule"><span class="rule-num">03</span><span>Activa “Abrir como app” y pulsa Añadir.</span></div>
+    </div>
+    <button id="btnInstallClose">Entendido</button>
+  </div>
+
+  <!-- ERROR SCREEN -->
+  <div class="screen" id="screenError" hidden>
+    <div class="glyph" style="border-color:var(--red); color:var(--red);">!</div>
+    <div class="eyebrow" style="color:var(--red);">Sin acceso</div>
+    <h1>No se pudo abrir la cámara</h1>
+    <p class="desc" id="errorMsg">Revisa los permisos de cámara del navegador e inténtalo de nuevo.</p>
+    <button id="btnRetry">Reintentar</button>
+  </div>
+
+  <!-- CALIBRATING -->
+  <div class="screen" id="screenCalib" hidden>
+    <div class="glyph">⋯</div>
+    <div class="eyebrow">Calibrando</div>
+    <h1>Encuadra tu rostro</h1>
+    <p class="desc">Colócate centrado, con buena luz, y espera a que termine el ajuste automático.</p>
+  </div>
+
+  <!-- COUNTDOWN -->
+  <div class="screen" id="screenCountdown" hidden>
+    <div class="eyebrow">Prepárate</div>
+    <div class="countdown-num mono" id="countdownNum">3</div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="screen" id="screenOver" hidden>
+    <div class="eyebrow" style="color:var(--red);" id="overEyebrow">Movimiento detectado</div>
+    <div class="result-num mono fail" id="overTime">0.0s</div>
+    <p class="desc" id="overDesc">Casi. Tu récord de la sesión sigue en pie.</p>
+    <button id="btnAgain">Volver a jugar</button>
+    <button class="ghost" id="btnStop">Volver al inicio</button>
+  </div>
+</div>
+
+<script type="text/disabled">
+(function(){
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const octx = overlay.getContext('2d');
+
+  const screens = {
+    start: document.getElementById('screenStart'),
+    install: document.getElementById('screenInstall'),
+    error: document.getElementById('screenError'),
+    calib: document.getElementById('screenCalib'),
+    countdown: document.getElementById('screenCountdown'),
+    over: document.getElementById('screenOver'),
+  };
+  const statusLine = document.getElementById('statusLine');
+  const timerText = document.getElementById('timerText');
+  const bestText = document.getElementById('bestText');
+  const meterFill = document.getElementById('meterFill');
+  const recDot = document.getElementById('recDot');
+  const recLabel = document.getElementById('recLabel');
+  const errorMsg = document.getElementById('errorMsg');
+  const overTime = document.getElementById('overTime');
+  const overDesc = document.getElementById('overDesc');
+  const overEyebrow = document.getElementById('overEyebrow');
+  const countdownNum = document.getElementById('countdownNum');
+
+  let stream = null;
+  let bestSeconds = 0;
+  let rafId = null;
+  let running = false;
+
+  // offscreen analysis canvas (small = fast)
+  const AW = 96, AH = 128;
+  const acan = document.createElement('canvas');
+  acan.width = AW; acan.height = AH;
+  const actx = acan.getContext('2d', { willReadFrequently: true });
+
+  let startTime = 0;
+  let elapsed = 0;
+  let warmupUntil = 0;
+  let sensitivity = 0; // rising danger meter 0-100
+
+  let prevGray = null;   // Float32Array of last frame's grayscale samples
+  let prevMean = 0;
+  const PIXEL_DELTA = 14;      // per-pixel gray change (0-255) counted as "moved"
+  let warnRatio = 0.05;        // changedRatio above this -> amber
+  let triggerRatio = 0.10;     // changedRatio above this -> counts toward loss
+  let calibrating = false;
+
+  function showScreen(name){
+    Object.values(screens).forEach(s => s.hidden = true);
+    if (name) screens[name].hidden = false;
+  }
+
+  function fmt(s){ return s.toFixed(1) + 's'; }
+
+  function resizeOverlay(){
+    const rect = video.getBoundingClientRect();
+    overlay.width = rect.width;
+    overlay.height = rect.height;
+  }
+  window.addEventListener('resize', resizeOverlay);
+
+  async function startCamera(){
+    showScreen(null);
+    statusLine.textContent = 'SOLICITANDO CÁMARA…';
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width:{ideal:480}, height:{ideal:640} }, audio:false });
+      video.srcObject = stream;
+      await video.play();
+      resizeOverlay();
+      recDot.classList.add('live');
+      recLabel.textContent = 'EN VIVO';
+      beginCalibration();
+    }catch(err){
+      let msg = 'Revisa los permisos de cámara del navegador e inténtalo de nuevo.';
+      if (err && err.name === 'NotAllowedError') msg = 'Bloqueaste el acceso a la cámara. Actívalo en los ajustes del sitio y reintenta.';
+      if (err && err.name === 'NotFoundError') msg = 'No se encontró ninguna cámara conectada a este dispositivo.';
+      errorMsg.textContent = msg;
+      showScreen('error');
+    }
+  }
+
+  function stopCamera(){
+    if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (rafId) cancelAnimationFrame(rafId);
+    running = false;
+    recDot.classList.remove('live');
+    recLabel.textContent = 'STANDBY';
+    showScreen('start');
+    statusLine.textContent = 'ESPERANDO INICIO';
+    timerText.textContent = '0.0s';
+    meterFill.style.width = '0%';
+  }
+
+  function beginCalibration(){
+    showScreen('calib');
+    statusLine.textContent = 'CALIBRANDO SENSOR…';
+    prevGray = null;
+    prevMean = 0;
+    calibrating = true;
+
+    const samples = [];
+    const duration = 1500;
+    const startedAt = performance.now();
+
+    function sampleStep(){
+      if (!calibrating) return;
+      const ratio = analyzeMotion();
+      if (ratio > 0) samples.push(ratio); // skip the first (baseline-less) frame
+      if (performance.now() - startedAt < duration){
+        requestAnimationFrame(sampleStep);
+      } else {
+        finishCalibration(samples);
+      }
+    }
+    requestAnimationFrame(sampleStep);
+  }
+
+  function finishCalibration(samples){
+    calibrating = false;
+    if (samples.length >= 4){
+      const mean = samples.reduce((a,b) => a+b, 0) / samples.length;
+      const variance = samples.reduce((a,b) => a + (b-mean)*(b-mean), 0) / samples.length;
+      const std = Math.sqrt(variance);
+      // thresholds sit comfortably above the measured resting noise
+      warnRatio = Math.min(0.18, Math.max(0.015, mean + std * 2.5 + 0.01));
+      triggerRatio = Math.min(0.30, Math.max(0.035, mean + std * 5 + 0.025));
+    } else {
+      warnRatio = 0.05;
+      triggerRatio = 0.10;
+    }
+    beginCountdown();
+  }
+
+  function beginCountdown(){
+    showScreen('countdown');
+    let n = 3;
+    countdownNum.textContent = n;
+    const iv = setInterval(() => {
+      n -= 1;
+      if (n <= 0){
+        clearInterval(iv);
+        countdownNum.textContent = 'YA';
+        setTimeout(beginRound, 350);
+      } else {
+        countdownNum.textContent = n;
+      }
+    }, 700);
+  }
+
+  function beginRound(){
+    showScreen(null);
+    statusLine.textContent = 'NO TE MUEVAS';
+    statusLine.classList.remove('warn','danger');
+    sensitivity = 0;
+    startTime = performance.now();
+    warmupUntil = startTime + 600; // ignore first 600ms (autoexposure settling)
+    running = true;
+    loop();
+  }
+
+  function drawHUDOverlay(danger){
+    resizeOverlay();
+    const w = overlay.width, h = overlay.height;
+    octx.clearRect(0,0,w,h);
+
+    // corner brackets
+    const m = 22, L = 26;
+    octx.strokeStyle = danger ? 'rgba(255,77,94,0.85)' : 'rgba(62,240,140,0.75)';
+    octx.lineWidth = 2;
+    const corners = [[m,m,1,1],[w-m,m,-1,1],[m,h-m,1,-1],[w-m,h-m,-1,-1]];
+    corners.forEach(([x,y,dx,dy]) => {
+      octx.beginPath();
+      octx.moveTo(x, y + L*dy);
+      octx.lineTo(x, y);
+      octx.lineTo(x + L*dx, y);
+      octx.stroke();
+    });
+
+    // scanline sweep across the whole frame
+    if (running){
+      const t = (performance.now() % 2200) / 2200;
+      const sy = m + t * (h - m*2);
+      const grad = octx.createLinearGradient(0, sy-10, 0, sy+10);
+      grad.addColorStop(0, 'rgba(62,240,140,0)');
+      grad.addColorStop(0.5, danger ? 'rgba(255,77,94,0.55)' : 'rgba(62,240,140,0.55)');
+      grad.addColorStop(1, 'rgba(62,240,140,0)');
+      octx.fillStyle = grad;
+      octx.fillRect(0, sy-10, w, 20);
+    }
+  }
+
+  // Returns the fraction (0-1) of sampled pixels whose brightness changed
+  // more than PIXEL_DELTA versus the previous frame, after cancelling out
+  // any uniform brightness shift (auto-exposure flicker, light dimming)
+  // so only structured/local movement is counted.
+  function analyzeMotion(){
+    actx.save();
+    actx.translate(AW, 0);
+    actx.scale(-1, 1);
+    actx.drawImage(video, 0, 0, AW, AH);
+    actx.restore();
+    const frame = actx.getImageData(0, 0, AW, AH).data;
+
+    const step = 2;
+    const cols = Math.ceil(AW / step), rows = Math.ceil(AH / step);
+    const gray = new Float32Array(cols * rows);
+    let sum = 0, idx = 0;
+    for (let y = 0; y < AH; y += step){
+      for (let x = 0; x < AW; x += step){
+        const i = (y * AW + x) * 4;
+        const g = (frame[i] + frame[i+1] + frame[i+2]) / 3;
+        gray[idx++] = g;
+        sum += g;
+      }
+    }
+    const mean = sum / gray.length;
+
+    if (!prevGray){
+      prevGray = gray;
+      prevMean = mean;
+      return 0;
+    }
+
+    // global brightness delta (flicker / exposure) — subtract this out
+    const brightnessShift = mean - prevMean;
+
+    let changed = 0;
+    for (let i = 0; i < gray.length; i++){
+      const d = Math.abs((gray[i] - mean) - (prevGray[i] - prevMean));
+      if (d > PIXEL_DELTA) changed++;
+    }
+
+    prevGray = gray;
+    prevMean = mean;
+    return changed / gray.length;
+  }
+
+  function loop(){
+    if (!running) return;
+    const now = performance.now();
+    elapsed = (now - startTime) / 1000;
+    timerText.textContent = fmt(elapsed);
+
+    const inWarmup = now < warmupUntil;
+    const ratio = analyzeMotion();
+
+    if (!inWarmup){
+      if (ratio > triggerRatio * 1.8){
+        // sharp, unmistakable spike — no need to wait it out
+        sensitivity = 100;
+      } else if (ratio > warnRatio){
+        // scale contribution by how far past the warn line we are
+        const over = (ratio - warnRatio) / Math.max(0.001, triggerRatio - warnRatio);
+        sensitivity = Math.min(100, sensitivity + over * 42);
+      } else {
+        sensitivity = Math.max(0, sensitivity - 10);
+      }
+    }
+
+    const danger = sensitivity > 55;
+    meterFill.style.width = Math.min(100, sensitivity) + '%';
+    meterFill.style.background = danger ? 'var(--red)' : (sensitivity > 25 ? 'var(--amber)' : 'var(--green)');
+    statusLine.textContent = inWarmup ? 'AJUSTANDO EXPOSICIÓN…' : (danger ? 'MOVIMIENTO…' : 'NO TE MUEVAS');
+    statusLine.classList.toggle('danger', danger && !inWarmup);
+
+    drawHUDOverlay(danger && !inWarmup);
+
+    if (!inWarmup && sensitivity >= 100){
+      endRound(true);
+      return;
+    }
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function endRound(failed){
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    const finalTime = elapsed;
+    if (finalTime > bestSeconds){
+      bestSeconds = finalTime;
+      bestText.textContent = fmt(bestSeconds);
+    }
+    overTime.textContent = fmt(finalTime);
+    overEyebrow.textContent = 'Movimiento detectado';
+    overDesc.textContent = finalTime >= bestSeconds && finalTime > 0
+      ? '¡Nuevo récord de la sesión! Inténtalo de nuevo para superarlo.'
+      : 'Casi. Tu récord de la sesión sigue en pie.';
+    showScreen('over');
+    statusLine.textContent = 'RONDA FINALIZADA';
+    meterFill.style.width = '0%';
+  }
+
+  document.getElementById('btnStart').addEventListener('click', startCamera);
+  document.getElementById('btnRetry').addEventListener('click', startCamera);
+  document.getElementById('btnAgain').addEventListener('click', beginCalibration);
+  document.getElementById('btnStop').addEventListener('click', stopCamera);
+
+  showScreen('start');
+})();
+</script>
+
+<script type="module">
+(function(){
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const octx = overlay.getContext('2d');
+  const screens = {
+    start: document.getElementById('screenStart'),
+    install: document.getElementById('screenInstall'),
+    error: document.getElementById('screenError'),
+    calib: document.getElementById('screenCalib'),
+    countdown: document.getElementById('screenCountdown'),
+    over: document.getElementById('screenOver')
+  };
+  const statusLine = document.getElementById('statusLine');
+  const timerText = document.getElementById('timerText');
+  const bestText = document.getElementById('bestText');
+  const recDot = document.getElementById('recDot');
+  const recLabel = document.getElementById('recLabel');
+  const errorMsg = document.getElementById('errorMsg');
+  const overTime = document.getElementById('overTime');
+  const overDesc = document.getElementById('overDesc');
+  const overEyebrow = document.getElementById('overEyebrow');
+  const countdownNum = document.getElementById('countdownNum');
+  const facePrompt = screens.calib.querySelector('h1');
+  const faceHelp = screens.calib.querySelector('p.desc');
+
+  let stream = null;
+  let faceLandmarker = null;
+  let detectorPromise = null;
+  let rafId = null;
+  let state = 'idle';
+  let bestSeconds = 0;
+  let startTime = 0;
+  let elapsed = 0;
+  let lastDetectionAt = 0;
+  let faceVisible = false;
+  let faceMissingSince = 0;
+  let stableSince = 0;
+  let countdownToken = 0;
+  let baselineSamples = [];
+  let baselinePose = null;
+  let lastPose = null;
+  let smoothedPose = null;
+  let movingFrames = 0;
+  let wakeLock = null;
+
+  const LANDMARK_IDS = [1, 10, 33, 61, 133, 152, 234, 263, 291, 362, 454];
+  const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const DETECTION_INTERVAL = IS_IOS ? 45 : 34;
+  const MOVEMENT_TOLERANCE = 1.20;
+  const BASE_MOVE_LIMITS = { center:0.026, scale:0.030, rotation:0.030, shape:0.017 };
+  const MOVE_LIMITS = {
+    center: BASE_MOVE_LIMITS.center * MOVEMENT_TOLERANCE,
+    scale: BASE_MOVE_LIMITS.scale * MOVEMENT_TOLERANCE,
+    rotation: BASE_MOVE_LIMITS.rotation * MOVEMENT_TOLERANCE,
+    shape: BASE_MOVE_LIMITS.shape * MOVEMENT_TOLERANCE
+  };
+
+  function showScreen(name){
+    Object.values(screens).forEach(screen => screen.hidden = true);
+    if (name) screens[name].hidden = false;
+  }
+
+  function fmt(seconds){ return seconds.toFixed(1) + 's'; }
+
+  function resizeOverlay(){
+    const rect = video.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+    if (overlay.width !== width) overlay.width = width;
+    if (overlay.height !== height) overlay.height = height;
+  }
+  window.addEventListener('resize', resizeOverlay);
+  window.addEventListener('orientationchange', () => setTimeout(resizeOverlay, 180));
+
+  async function keepScreenAwake(){
+    if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+    try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(_error){}
+  }
+
+  function releaseWakeLock(){
+    if (wakeLock){ wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+
+  async function ensureFaceDetector(){
+    if (faceLandmarker) return faceLandmarker;
+    if (detectorPromise) return detectorPromise;
+    detectorPromise = (async () => {
+      const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm');
+      const fileset = await vision.FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
+      );
+      const options = {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+          delegate: 'GPU'
+        },
+        runningMode: 'VIDEO',
+        numFaces: 1,
+        minFaceDetectionConfidence: 0.65,
+        minFacePresenceConfidence: 0.65,
+        minTrackingConfidence: 0.65
+      };
+      try{
+        faceLandmarker = await vision.FaceLandmarker.createFromOptions(fileset, options);
+      }catch(gpuError){
+        options.baseOptions.delegate = 'CPU';
+        faceLandmarker = await vision.FaceLandmarker.createFromOptions(fileset, options);
+      }
+      return faceLandmarker;
+    })();
+    try{
+      return await detectorPromise;
+    }catch(error){
+      detectorPromise = null;
+      throw error;
+    }
+  }
+
+  async function startCamera(){
+    showScreen(null);
+    statusLine.textContent = 'CARGANDO DETECTOR FACIAL...';
+    try{
+      if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        throw new Error('IOS_SECURE_CAMERA_REQUIRED');
+      }
+      const detectorReady = ensureFaceDetector();
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode:'user',
+          width:{ideal:480},
+          height:{ideal:640},
+          frameRate:{ideal:24, max:30}
+        },
+        audio:false
+      });
+      video.srcObject = stream;
+      await video.play();
+      await detectorReady;
+      await keepScreenAwake();
+      resizeOverlay();
+      recDot.classList.add('live');
+      recLabel.textContent = 'EN VIVO';
+      beginFaceSearch();
+      rafId = requestAnimationFrame(faceLoop);
+    }catch(error){
+      if (stream){ stream.getTracks().forEach(track => track.stop()); stream = null; }
+      video.srcObject = null;
+      let message = 'Revisa los permisos de cámara del navegador e inténtalo de nuevo.';
+      if (error && error.message === 'IOS_SECURE_CAMERA_REQUIRED') message = 'Para usar la cámara en iPhone, abre el juego desde una dirección HTTPS en Safari.';
+      if (error && error.name === 'NotAllowedError') message = 'Bloqueaste el acceso a la cámara. Actívalo en los ajustes del sitio y reintenta.';
+      if (error && error.name === 'NotFoundError') message = 'No se encontró ninguna cámara conectada a este dispositivo.';
+      if (error && error.name === 'NotReadableError') message = 'La cámara está siendo usada por otra app. Ciérrala y vuelve a intentarlo.';
+      if (error && error.message && /detector|mediapipe|wasm|fetch/i.test(error.message)) message = 'No se pudo cargar el detector facial. Comprueba la conexión a Internet y vuelve a intentarlo.';
+      errorMsg.textContent = message;
+      showScreen('error');
+    }
+  }
+
+  function stopCamera(){
+    if (stream){ stream.getTracks().forEach(track => track.stop()); stream = null; }
+    video.srcObject = null;
+    releaseWakeLock();
+    if (rafId) cancelAnimationFrame(rafId);
+    state = 'idle';
+    countdownToken++;
+    faceVisible = false;
+    recDot.classList.remove('live');
+    recLabel.textContent = 'STANDBY';
+    statusLine.textContent = 'ESPERANDO INICIO';
+    timerText.textContent = '0.0s';
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    showScreen('start');
+  }
+
+  function beginFaceSearch(message){
+    state = 'searching';
+    countdownToken++;
+    showScreen('calib');
+    facePrompt.textContent = message || 'Buscando tu rostro';
+    faceHelp.textContent = 'Colócate centrado y con buena luz. La cuenta atrás solo comenzará cuando se detecte tu cara.';
+    statusLine.textContent = 'BUSCANDO ROSTRO...';
+    statusLine.classList.remove('warn', 'danger');
+    stableSince = 0;
+    baselineSamples = [];
+    baselinePose = null;
+    lastPose = null;
+    smoothedPose = null;
+    movingFrames = 0;
+  }
+
+  function beginCountdown(){
+    if (state !== 'searching' || !faceVisible) return;
+    state = 'countdown';
+    showScreen('countdown');
+    statusLine.textContent = 'ROSTRO DETECTADO';
+    baselineSamples = [];
+    const token = ++countdownToken;
+
+    function tick(number){
+      if (token !== countdownToken || state !== 'countdown') return;
+      if (!faceVisible){
+        beginFaceSearch('Rostro no detectado');
+        return;
+      }
+      if (number === 0){
+        countdownNum.textContent = 'YA';
+        setTimeout(() => {
+          if (token === countdownToken && state === 'countdown' && faceVisible) beginRound();
+        }, 250);
+        return;
+      }
+      countdownNum.textContent = number;
+      setTimeout(() => tick(number - 1), 750);
+    }
+    tick(3);
+  }
+
+  function beginRound(){
+    if (!faceVisible || baselineSamples.length < 4){
+      beginFaceSearch('Mantén tu cara visible');
+      return;
+    }
+    baselinePose = averagePoses(baselineSamples.slice(-18));
+    smoothedPose = baselinePose;
+    lastPose = baselinePose;
+    showScreen(null);
+    statusLine.textContent = 'NO TE MUEVAS';
+    statusLine.classList.remove('warn', 'danger');
+    startTime = performance.now();
+    elapsed = 0;
+    movingFrames = 0;
+    faceMissingSince = 0;
+    state = 'running';
+  }
+
+  function drawHUDOverlay(landmarks, danger){
+    resizeOverlay();
+    const width = overlay.width;
+    const height = overlay.height;
+    octx.clearRect(0, 0, width, height);
+    const margin = 22;
+    const length = 26;
+    octx.strokeStyle = danger ? 'rgba(255,77,94,0.85)' : 'rgba(62,240,140,0.75)';
+    octx.lineWidth = 2;
+    [[margin,margin,1,1],[width-margin,margin,-1,1],[margin,height-margin,1,-1],[width-margin,height-margin,-1,-1]].forEach(([x,y,dx,dy]) => {
+      octx.beginPath();
+      octx.moveTo(x, y + length*dy);
+      octx.lineTo(x, y);
+      octx.lineTo(x + length*dx, y);
+      octx.stroke();
+    });
+
+    if (!landmarks) return;
+    const outline = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+    octx.beginPath();
+    outline.forEach((id, index) => {
+      const point = landmarks[id];
+      const x = (1 - point.x) * width;
+      const y = point.y * height;
+      if (index === 0) octx.moveTo(x, y); else octx.lineTo(x, y);
+    });
+    octx.closePath();
+    octx.strokeStyle = danger ? 'rgba(255,77,94,0.9)' : 'rgba(62,240,140,0.85)';
+    octx.lineWidth = 1.5;
+    octx.stroke();
+  }
+
+  function pointAverage(a, b){ return {x:(a.x+b.x)/2, y:(a.y+b.y)/2}; }
+  function distance(a, b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+  function extractPose(landmarks){
+    const leftEye = pointAverage(landmarks[33], landmarks[133]);
+    const rightEye = pointAverage(landmarks[362], landmarks[263]);
+    const center = {
+      x:(landmarks[10].x + landmarks[152].x + landmarks[234].x + landmarks[454].x) / 4,
+      y:(landmarks[10].y + landmarks[152].y + landmarks[234].y + landmarks[454].y) / 4
+    };
+    const width = Math.max(0.001, distance(landmarks[234], landmarks[454]));
+    const rotation = Math.atan2(rightEye.y-leftEye.y, rightEye.x-leftEye.x);
+    const cos = Math.cos(-rotation);
+    const sin = Math.sin(-rotation);
+    const signature = LANDMARK_IDS.map(id => {
+      const dx = (landmarks[id].x-center.x) / width;
+      const dy = (landmarks[id].y-center.y) / width;
+      return {x:dx*cos-dy*sin, y:dx*sin+dy*cos};
+    });
+    return {cx:center.x, cy:center.y, width, rotation, signature};
+  }
+
+  function smooth(current, previous, alpha){
+    if (!previous) return current;
+    const mix = (from, to) => from + (to-from)*alpha;
+    return {
+      cx:mix(previous.cx,current.cx),
+      cy:mix(previous.cy,current.cy),
+      width:mix(previous.width,current.width),
+      rotation:mix(previous.rotation,current.rotation),
+      signature:current.signature.map((point,index) => ({
+        x:mix(previous.signature[index].x,point.x),
+        y:mix(previous.signature[index].y,point.y)
+      }))
+    };
+  }
+
+  function angleDifference(a, b){ return Math.abs(Math.atan2(Math.sin(a-b), Math.cos(a-b))); }
+
+  function poseMovement(pose, reference){
+    const center = Math.hypot(pose.cx-reference.cx, pose.cy-reference.cy) / reference.width;
+    const scale = Math.abs(Math.log(pose.width/reference.width));
+    const rotation = angleDifference(pose.rotation, reference.rotation);
+    let shapeSum = 0;
+    pose.signature.forEach((point,index) => {
+      const target = reference.signature[index];
+      shapeSum += (point.x-target.x)**2 + (point.y-target.y)**2;
+    });
+    const shape = Math.sqrt(shapeSum / pose.signature.length);
+    return {
+      center, scale, rotation, shape,
+      score:Math.max(center/MOVE_LIMITS.center, scale/MOVE_LIMITS.scale, rotation/MOVE_LIMITS.rotation, shape/MOVE_LIMITS.shape)
+    };
+  }
+
+  function averagePoses(poses){
+    const result = {
+      cx:0, cy:0, width:0, rotation:0,
+      signature:poses[0].signature.map(() => ({x:0,y:0}))
+    };
+    poses.forEach(pose => {
+      result.cx += pose.cx;
+      result.cy += pose.cy;
+      result.width += pose.width;
+      result.rotation += pose.rotation;
+      pose.signature.forEach((point,index) => {
+        result.signature[index].x += point.x;
+        result.signature[index].y += point.y;
+      });
+    });
+    const count = poses.length;
+    result.cx/=count; result.cy/=count; result.width/=count; result.rotation/=count;
+    result.signature.forEach(point => { point.x/=count; point.y/=count; });
+    return result;
+  }
+
+  function handleFace(landmarks, now){
+    faceVisible = Boolean(landmarks);
+    if (!landmarks){
+      drawHUDOverlay(null, state === 'running');
+      if (state === 'searching'){
+        stableSince = 0;
+        lastPose = null;
+        smoothedPose = null;
+        facePrompt.textContent = 'Buscando tu rostro';
+        statusLine.textContent = 'BUSCANDO ROSTRO...';
+      }else if (state === 'countdown'){
+        beginFaceSearch('Rostro no detectado');
+      }else if (state === 'running'){
+        if (!faceMissingSince) faceMissingSince = now;
+        if (now-faceMissingSince > 180) endRound('Rostro perdido');
+      }
+      return;
+    }
+
+    faceMissingSince = 0;
+    const rawPose = extractPose(landmarks);
+    smoothedPose = smooth(rawPose, smoothedPose, state === 'running' ? 0.58 : 0.42);
+
+    if (state === 'searching'){
+      drawHUDOverlay(landmarks, false);
+      facePrompt.textContent = 'Rostro detectado';
+      faceHelp.textContent = 'Quédate quieto un instante. La cuenta atrás comenzará automáticamente.';
+      statusLine.textContent = 'ROSTRO DETECTADO · QUÉDATE QUIETO';
+      const stable = !lastPose || poseMovement(smoothedPose,lastPose).score < 1.35;
+      if (!stable || !stableSince) stableSince = now;
+      lastPose = smoothedPose;
+      if (now-stableSince >= 650) beginCountdown();
+      return;
+    }
+
+    if (state === 'countdown'){
+      drawHUDOverlay(landmarks, false);
+      baselineSamples.push(smoothedPose);
+      if (baselineSamples.length > 24) baselineSamples.shift();
+      if (lastPose && poseMovement(smoothedPose,lastPose).score > 2.4){
+        beginFaceSearch('Vuelve a colocarte');
+        return;
+      }
+      lastPose = smoothedPose;
+      return;
+    }
+
+    if (state === 'running'){
+      elapsed = (now-startTime)/1000;
+      timerText.textContent = fmt(elapsed);
+      const movement = poseMovement(smoothedPose,baselinePose);
+      const danger = movement.score >= 1;
+      drawHUDOverlay(landmarks,danger);
+      statusLine.textContent = danger ? 'MOVIMIENTO DETECTADO' : 'NO TE MUEVAS';
+      statusLine.classList.toggle('danger',danger);
+      if (movement.score >= 1.55){
+        endRound('Movimiento detectado');
+      }else if (movement.score >= 1){
+        movingFrames++;
+        if (movingFrames >= 2) endRound('Movimiento detectado');
+      }else{
+        movingFrames = 0;
+      }
+    }else{
+      drawHUDOverlay(landmarks,false);
+    }
+  }
+
+  function faceLoop(now){
+    if (!stream || !faceLandmarker || state === 'idle') return;
+    if (now-lastDetectionAt >= DETECTION_INTERVAL && video.readyState >= 2){
+      lastDetectionAt = now;
+      try{
+        const result = faceLandmarker.detectForVideo(video,now);
+        handleFace(result.faceLandmarks && result.faceLandmarks[0],now);
+      }catch(error){
+        console.error('Error del detector facial:',error);
+      }
+    }
+    rafId = requestAnimationFrame(faceLoop);
+  }
+
+  function endRound(reason){
+    if (state !== 'running') return;
+    state = 'over';
+    const finalTime = elapsed;
+    const isRecord = finalTime > bestSeconds;
+    if (isRecord){
+      bestSeconds = finalTime;
+      bestText.textContent = fmt(bestSeconds);
+    }
+    overTime.textContent = fmt(finalTime);
+    overEyebrow.textContent = reason;
+    overDesc.textContent = isRecord && finalTime > 0
+      ? '¡Nuevo récord de la sesión! Inténtalo de nuevo para superarlo.'
+      : 'Casi. Tu récord de la sesión sigue en pie.';
+    showScreen('over');
+    statusLine.textContent = 'RONDA FINALIZADA';
+    statusLine.classList.remove('danger');
+  }
+
+  document.getElementById('btnStart').addEventListener('click',startCamera);
+  document.getElementById('btnInstall').addEventListener('click',() => showScreen('install'));
+  document.getElementById('btnInstallClose').addEventListener('click',() => showScreen('start'));
+  document.getElementById('btnRetry').addEventListener('click',startCamera);
+  document.getElementById('btnAgain').addEventListener('click',() => beginFaceSearch());
+  document.getElementById('btnStop').addEventListener('click',stopCamera);
+  document.addEventListener('visibilitychange',() => {
+    if (document.visibilityState === 'hidden'){
+      releaseWakeLock();
+    }else if (stream){
+      video.play().catch(() => {});
+      keepScreenAwake();
+      setTimeout(resizeOverlay, 100);
+    }
+  });
+  window.addEventListener('pagehide', releaseWakeLock);
+  if ('serviceWorker' in navigator && location.protocol === 'https:'){
+    window.addEventListener('load',() => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  }
+  showScreen('start');
+})();
+</script>
+
+</body>
+</html>
